@@ -1,0 +1,22 @@
+*filter
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:logging-drop - [0:0]
+:conn-limit - [0:0]
+:conn-limit-accept - [0:0]
+:custom-input - [0:0]
+:custom-output - [0:0]
+
+# detaching custom input/output chains
+-D INPUT -j custom-input
+-D OUTPUT -j custom-output
+
+# flushing custom chains
+-F logging-drop
+-F conn-limit
+-F conn-limit-accept
+-F custom-input
+-F custom-output
+
+COMMIT
+

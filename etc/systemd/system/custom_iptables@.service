@@ -1,0 +1,17 @@
+[Unit]
+Description=Custom iptables rules (%i)
+After=network-pre.target
+ConditionPathExists=/etc/iptables/
+
+[Service]
+Environment=IPTABLES_RULES=/etc/iptables/%i.rules
+Environment=IPTABLES_RULES_FLUSH=/etc/iptables/%i.flush.rules
+Type=oneshot
+ExecStart=/sbin/iptables-restore -v -n $IPTABLES_RULES
+ExecStop=/sbin/iptables-restore -v -n $IPTABLES_RULES_FLUSH
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+DefaultInstance=base
+

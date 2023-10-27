@@ -1,0 +1,64 @@
+*filter
+:INPUT DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+:logging-drop - [0:0]
+:conn-limit - [0:0]
+:conn-limit-accept - [0:0]
+:custom-input - [0:0]
+:custom-output - [0:0]
+
+# flushing custom chains
+-F logging-drop
+-F conn-limit
+-F conn-limit-accept
+-F custom-input
+-F custom-output
+
+# attaching custom input/output chains
+-A INPUT -j custom-input
+-A OUTPUT -j custom-output
+
+# -- applying custom rules --
+### localhost
+-A custom-input -i lo -j ACCEPT
+-A custom-input ! -i lo -s 127.0.0.0/8 -j REJECT
+-A custom-output -o lo -j ACCEPT
+
+### icmp
+-A custom-input -p icmp -m icmp --icmp-type 3 -j ACCEPT
+-A custom-input -p icmp -m icmp --icmp-type 11 -j ACCEPT
+-A custom-input -p icmp -m icmp --icmp-type 12 -j ACCEPT
+-A custom-input -p icmp -m icmp --icmp-type 8 -j ACCEPT
+-A custom-output -p icmp -j ACCEPT
+
+### invalid
+-A custom-input -m conntrack --ctstate INVALID -j logging-drop
+-A logging-drop -m conntrack --ctstate INVALID -m limit --limit 3/min --limit-burst 10 -j RETURN
+-A logging-drop -m limit --limit 3/min --limit-burst 10 -j LOG --log-level info --log-prefix "IPTABLES DROP "
+-A custom-input -m conntrack --ctstate INVALID -j DROP
+
+### SSH connections limit
+-A custom-input -p tcp -m tcp --dport 22 -m conntrack --ctstate NEW -j LOG --log-level info --log-prefix "IPTABLES SSH "
+-A custom-input -p tcp -m tcp --dport 22 -m conntrack --ctstate NEW -m recent --set --name DEFAULT --mask 255.255.255.255 --rsource
+-A custom-input -p tcp -m tcp --dport 22 -m conntrack --ctstate NEW -m recent --update --seconds 30 --hitcount 5 --name DEFAULT --mask 255.255.255.255 --rsource -j conn-limit
+-A custom-input -p tcp -m tcp --dport 22 -j conn-limit-accept
+
+### input
+-A custom-input -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+
+### output
+-A custom-output -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A custom-output -p tcp -m conntrack --ctstate NEW -j ACCEPT
+-A custom-output -p udp -m conntrack --ctstate NEW -j ACCEPT
+
+### end
+-A conn-limit -m limit --limit 3/min -j LOG --log-level info --log-prefix "IPTABLES REJECT "
+-A conn-limit -j REJECT --reject-with icmp-port-unreachable
+-A conn-limit-accept -j ACCEPT
+
+# -- end custom rules --
+-A custom-input -j RETURN
+-A custom-output -j RETURN
+
+COMMIT
+
